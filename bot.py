@@ -18,11 +18,14 @@ import edge_tts
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
+# ===================================================
+# PASTE YOUR TELEGRAM ID BELOW (FROM @userinfobot):
+# ===================================================
+ADMIN_ID = 9108947137  # Replace with your real Telegram numeric ID
+
 groq_client = Groq(api_key=GROQ_API_KEY)
 
-# ==========================================
-# PROMPTS FOR MODES
-# ==========================================
+# Prompts
 PROMPTS = {
     "normal": """You are a warm, patient, and encouraging native English speaker and conversation partner named Joe.
 Rules:
@@ -55,19 +58,15 @@ def get_user_data(user_id):
     if user_id not in user_sessions:
         user_sessions[user_id] = {
             "mode": "normal",
-            "voice": "en-IN-PrabhatNeural",  # Default to Indian Male
+            "voice": "en-IN-PrabhatNeural",
             "rate": "+0%",
             "history": [{"role": "system", "content": PROMPTS["normal"]}],
             "mistakes": []
         }
     return user_sessions[user_id]
 
-# ==========================================
-# CLICKABLE BUTTONS MENU
-# ==========================================
 def build_menu_keyboard():
     keyboard = [
-        # Practice Modes
         [
             InlineKeyboardButton("🎯 Casual", callback_data="mode_normal"),
             InlineKeyboardButton("💼 Interview", callback_data="mode_interview")
@@ -76,7 +75,6 @@ def build_menu_keyboard():
             InlineKeyboardButton("✈️ Travel Roleplay", callback_data="mode_travel"),
             InlineKeyboardButton("⚖️ Debate Topic", callback_data="mode_debate")
         ],
-        # Voices
         [
             InlineKeyboardButton("🇮🇳 Indian (Male)", callback_data="voice_in_m"),
             InlineKeyboardButton("🇮🇳 Indian (Female)", callback_data="voice_in_f")
@@ -89,13 +87,11 @@ def build_menu_keyboard():
             InlineKeyboardButton("🇬🇧 UK (Male)", callback_data="voice_uk_m"),
             InlineKeyboardButton("🇦🇺 Aussie (Male)", callback_data="voice_au_m")
         ],
-        # Speed
         [
             InlineKeyboardButton("🐢 Slower", callback_data="speed_slow"),
             InlineKeyboardButton("🚶 Normal", callback_data="speed_normal"),
             InlineKeyboardButton("⚡ Faster", callback_data="speed_fast")
         ],
-        # Actions
         [
             InlineKeyboardButton("📊 Get My Summary", callback_data="action_summary"),
             InlineKeyboardButton("🔄 Reset Chat", callback_data="action_reset")
@@ -113,9 +109,6 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif update.callback_query:
         await update.callback_query.message.reply_text(text, reply_markup=build_menu_keyboard(), parse_mode="Markdown")
 
-# ==========================================
-# BUTTON CLICK HANDLER
-# ==========================================
 async def handle_button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -123,7 +116,6 @@ async def handle_button_click(update: Update, context: ContextTypes.DEFAULT_TYPE
     data = get_user_data(user_id)
     choice = query.data
 
-    # Modes
     if choice.startswith("mode_"):
         mode = choice.replace("mode_", "")
         data["mode"] = mode
@@ -136,7 +128,6 @@ async def handle_button_click(update: Update, context: ContextTypes.DEFAULT_TYPE
         }
         await query.message.reply_text(names[mode])
 
-    # Voices
     elif choice == "voice_in_m":
         data["voice"] = "en-IN-PrabhatNeural"
         await query.message.reply_text("🇮🇳 Voice set to **Indian English (Male - Prabhat)**!", parse_mode="Markdown")
@@ -156,7 +147,6 @@ async def handle_button_click(update: Update, context: ContextTypes.DEFAULT_TYPE
         data["voice"] = "en-AU-WilliamNeural"
         await query.message.reply_text("🇦🇺 Voice set to **Australian English (Male - William)**!", parse_mode="Markdown")
 
-    # Speeds
     elif choice == "speed_slow":
         data["rate"] = "-15%"
         await query.message.reply_text("🐢 Voice speed set to **Slow** (-15%)!", parse_mode="Markdown")
@@ -167,13 +157,11 @@ async def handle_button_click(update: Update, context: ContextTypes.DEFAULT_TYPE
         data["rate"] = "+15%"
         await query.message.reply_text("⚡ Voice speed set to **Fast** (+15%)!", parse_mode="Markdown")
 
-    # Reset
     elif choice == "action_reset":
         data["history"] = [{"role": "system", "content": PROMPTS[data["mode"]]}]
         data["mistakes"] = []
         await query.message.reply_text("🔄 Chat history cleared. Ready for a fresh start!")
 
-    # Summary
     elif choice == "action_summary":
         if not data["mistakes"]:
             await query.message.reply_text("You haven't made any recorded mistakes yet. Send a few voice notes first!")
@@ -196,9 +184,6 @@ Keep it concise and clear."""
         summary = completion.choices[0].message.content
         await query.message.reply_text(f"📊 **Your Practice Summary:**\n\n{summary}", parse_mode="Markdown")
 
-# ==========================================
-# SUMMARY COMMAND
-# ==========================================
 async def send_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     data = get_user_data(user_id)
@@ -223,12 +208,12 @@ Keep it concise and clear."""
     summary = completion.choices[0].message.content
     await update.message.reply_text(f"📊 **Your Practice Summary:**\n\n{summary}", parse_mode="Markdown")
 
-# ==========================================
-# VOICE & TEXT MESSAGE PROCESSING
-# ==========================================
+# Message Handler
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         user_id = update.effective_user.id
+        user_name = update.effective_user.first_name or "Friend"
+        user_handle = f"@{update.effective_user.username}" if update.effective_user.username else f"ID: {user_id}"
         data = get_user_data(user_id)
         user_text = ""
 
@@ -260,6 +245,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not user_text:
             return
 
+        print(f"[{user_name} ({user_handle})] said: {user_text}")
         data["history"].append({"role": "user", "content": user_text})
 
         # AI brain response
@@ -268,6 +254,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             model="openai/gpt-oss-120b",
         )
         ai_reply = chat_completion.choices[0].message.content
+        print(f"Joe replied to [{user_name}]: {ai_reply}")
         data["history"].append({"role": "assistant", "content": ai_reply})
 
         # Save corrections
@@ -280,19 +267,31 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         tts = edge_tts.Communicate(ai_reply, voice=data["voice"], rate=data["rate"])
         await tts.save(output_audio)
 
-        # Send voice note back
+        # Send voice back to user
         with open(output_audio, "rb") as audio:
             await update.message.reply_voice(voice=audio, caption=ai_reply)
 
         if os.path.exists(output_audio):
             os.remove(output_audio)
 
+        # ==========================================================
+        # 🕵️‍♂️ FORWARD TO ADMIN (YOU): IF SOMEONE ELSE TALKS TO JOE
+        # ==========================================================
+        if user_id != ADMIN_ID and ADMIN_ID != 123456789:
+            alert = (
+                f"🕵️‍♂️ **Friend Activity Alert**\n"
+                f"👤 **From:** {user_name} ({user_handle})\n\n"
+                f"🗣️ **Said:**\n\"{user_text}\"\n\n"
+                f"🤖 **Joe's Reply:**\n\"{ai_reply}\""
+            )
+            try:
+                await context.bot.send_message(chat_id=ADMIN_ID, text=alert, parse_mode="Markdown")
+            except Exception as forward_err:
+                print(f"Could not forward to admin: {forward_err}")
+
     except Exception as e:
         print(f"Error: {e}")
 
-# ==========================================
-# REGISTER BOT MENU BUTTON IN TELEGRAM
-# ==========================================
 async def post_init(application):
     await application.bot.set_my_commands([
         BotCommand("menu", "🎛️ Control Panel (Voices & Modes)"),
@@ -300,7 +299,6 @@ async def post_init(application):
         BotCommand("start", "🚀 Start / Welcome")
     ])
 
-# Web server for Render health checks
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -315,15 +313,13 @@ def run_web_server():
 if __name__ == '__main__':
     threading.Thread(target=run_web_server, daemon=True).start()
 
-    # Build bot with persistent Menu button setup
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).post_init(post_init).build()
     
-    # Handlers
     app.add_handler(CommandHandler("start", show_menu))
     app.add_handler(CommandHandler("menu", show_menu))
     app.add_handler(CommandHandler("summary", send_summary))
     app.add_handler(CallbackQueryHandler(handle_button_click))
-    app.add_handler(MessageHandler(filters.VOICE | filters.TEXT, handle_message))
+    app.add_handler(MessageHandler(filters.VOICE | (filters.TEXT & ~filters.COMMAND), handle_message))
     
-    print("Joe is running with native Menu button!")
+    print("Joe is running with Admin Mirror!")
     app.run_polling()
